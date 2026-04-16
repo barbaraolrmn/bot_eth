@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Memecoin Scanner (RU)</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #131a2e;
+      --muted: #9fb0d0;
+      --text: #eaf0ff;
+      --accent: #6ea8fe;
+      --danger: #ff6b6b;
+      --warn: #f7b84b;
+      --ok: #50d890;
+      --border: #263252;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, Segoe UI, Arial, sans-serif;
+      background: radial-gradient(circle at top, #111a33, var(--bg));
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    .header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+    h1 { margin: 0; font-size: 28px; }
+    .sub { color: var(--muted); margin-top: 6px; }
+    .modes { display: flex; gap: 8px; }
+    .mode-btn {
+      padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px;
+      background: #0f1528; color: var(--text); cursor: pointer;
+    }
+    .mode-btn.active { border-color: var(--accent); background: #1c2745; }
+    .panel {
+      background: rgba(19,26,46,.9); border: 1px solid var(--border);
+      border-radius: 16px; padding: 16px; margin-top: 16px;
+    }
+    textarea {
+      width: 100%; min-height: 76px; resize: vertical; background: #0f1528;
+      border: 1px solid var(--border); border-radius: 12px; color: var(--text);
+      padding: 12px; font-size: 16px;
+    }
+    .actions { display: flex; gap: 10px; margin-top: 12px; }
+    button.analyze {
+      background: linear-gradient(90deg,#4271ff,#6ea8fe); color: white;
+      border: none; border-radius: 10px; padding: 12px 18px; font-weight: 600; cursor: pointer;
+    }
+    .hero-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .kpi { background: #0f1528; border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+    .kpi .label { color: var(--muted); font-size: 13px; }
+    .kpi .value { font-size: 21px; font-weight: 700; margin-top: 4px; }
+    .summary-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+    .summary-block h3 { margin: 0 0 10px; }
+    ul { margin: 0; padding-left: 18px; }
+    .hard-fail {
+      background: rgba(255,107,107, .15);
+      border: 1px solid rgba(255,107,107,.7);
+      color: #ffd8d8;
+      padding: 12px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      display: none;
+    }
+    details {
+      background: #0f1528;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+    }
+    .json {
+      white-space: pre-wrap;
+      background: #0b1020;
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      color: #cde1ff;
+      max-height: 340px;
+      overflow: auto;
+      font-size: 12px;
+    }
+    .muted { color: var(--muted); }
+    @media (max-width: 900px) {
+      .hero-grid, .summary-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 640px) {
+      .hero-grid, .summary-grid { grid-template-columns: 1fr; }
+      .header { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <section class="header">
+      <div>
+        <h1>AI Memecoin Scanner</h1>
+        <div class="sub">Консервативный фильтр мусора, anti-FOMO и оценка качества сетапа.</div>
+      </div>
+      <div class="modes" role="tablist" aria-label="Режимы">
+        <button class="mode-btn active" data-mode="quick">Quick</button>
+        <button class="mode-btn" data-mode="deep">Deep</button>
+        <button class="mode-btn" data-mode="execution">Execution</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <label for="input"><strong>Главный ввод</strong></label>
+      <textarea id="input" placeholder="Вставьте тикер, CA, или ссылку на токен"></textarea>
+      <div class="actions">
+        <button class="analyze" id="analyzeBtn">Анализировать</button>
+      </div>
+      <p class="muted">Поддержка: тикер, контракт, DexScreener/GeckoTerminal/Pump.fun/Bonkfun, X/Telegram/сайт.</p>
+    </section>
+
+    <section class="panel" id="resultPanel" hidden>
+      <div class="hard-fail" id="hardFailBanner"></div>
+      <h2 style="margin-top:0">Результат</h2>
+      <div class="hero-grid">
+        <div class="kpi"><div class="label">Вердикт</div><div class="value" id="verdictLabel">-</div></div>
+        <div class="kpi"><div class="label">Итоговый score</div><div class="value" id="scoreTotal">0</div></div>
+        <div class="kpi"><div class="label">Уверенность</div><div class="value" id="confidence">low</div></div>
+        <div class="kpi"><div class="label">Рекомендация</div><div class="value" id="action">-</div></div>
+      </div>
+    </section>
+
+    <section class="panel" id="summaryPanel" hidden>
+      <div class="summary-grid">
+        <div class="summary-block">
+          <h3>Почему рискованно</h3>
+          <ul id="redFlags"></ul>
+        </div>
+        <div class="summary-block">
+          <h3>Почему интересно</h3>
+          <ul id="greenFlags"></ul>
+        </div>
+        <div class="summary-block">
+          <h3>Что делать сейчас</h3>
+          <ul id="nextSteps"></ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="detailsPanel" hidden>
+      <h3 style="margin-top:0">Детализация</h3>
+      <details open>
+        <summary>Саб-скоринг</summary>
+        <div id="subScores"></div>
+      </details>
+      <details>
+        <summary>Сигналы и missing data</summary>
+        <div id="missingData" class="muted"></div>
+      </details>
+      <details>
+        <summary>JSON output contract</summary>
+        <div id="jsonOutput" class="json"></div>
+      </details>
+    </section>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>
